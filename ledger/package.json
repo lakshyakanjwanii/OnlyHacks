@@ -1,0 +1,17 @@
+{
+  "name": "ledger-module",
+  "version": "1.0.0",
+  "description": "Hash-chained ledger and anomaly engine for Drug Supply Chain Control Tower",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "dotenv": "^17.4.2"
+  }
+}

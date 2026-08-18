@@ -18,7 +18,6 @@ import { AuditLogView } from './AuditLogView';
 export default function ScannerView() {
   const videoRef = useRef(null);
   const readerRef = useRef(null);
-  const scanCountRef = useRef({});
 
   const [isScanning, setIsScanning] = useState(false);
   const [parsedData, setParsedData] = useState(null);
@@ -49,8 +48,11 @@ export default function ScannerView() {
   }, []);
 
   function processScan(rawText) {
+    console.log('Decoded barcode:', rawText);
+
     const cleaned = rawText.trim();
 
+    // Plain retail/drug barcode number -> product lookup
     if (/^\d{8,14}$/.test(cleaned)) {
       setParsedData(null);
       setConflictResult(null);
@@ -58,41 +60,14 @@ export default function ScannerView() {
       setLookupLoading(true);
 
       lookupProduct(cleaned).then((info) => {
-        let shownBatch = null;
-        if (info.found && Array.isArray(info.batches) && info.batches.length > 0) {
-          const count = scanCountRef.current[cleaned] || 0;
-          const index = count % info.batches.length;
-          shownBatch = info.batches[index] || info.batches[0];
-          scanCountRef.current[cleaned] = count + 1;
-        }
-
-        setProductInfo({ ...info, shownBatch });
+        setProductInfo(info);
         setLookupLoading(false);
-
-        const found = info.found && shownBatch;
-
-        const pseudoParsed = {
-          gtin: cleaned,
-          batchNumber: found ? shownBatch.batch : 'N/A',
-          expiryDate: found ? shownBatch.expiry : 'N/A',
-          mfdDate: found ? shownBatch.mfd : 'N/A',
-          rawPayload: cleaned,
-        };
-
-        const conflict = found
-          ? detectConflict(pseudoParsed)
-          : { status: 'unknown-barcode', message: 'Barcode not found in database', previous: null };
-
-        setParsedData(pseudoParsed);
-        setConflictResult(conflict);
-
-        const updatedLogs = logScan(pseudoParsed, conflict);
-        setLogs(updatedLogs);
       });
 
       return;
     }
 
+    // Otherwise treat as GS1 element string (pharma DataMatrix demo flow)
     const parsed = parseGS1(cleaned);
     const conflict = detectConflict(parsed);
 
@@ -122,14 +97,6 @@ export default function ScannerView() {
         }
 
         if (err && !(err instanceof NotFoundException)) {
-          // Transient error while the video element is still initializing
-          // (videoWidth/videoHeight briefly 0 right after the camera opens).
-          // Self-resolves on the next frame — ignore it instead of
-          // surfacing a fatal camera error.
-          if (err.name === 'IndexSizeError') {
-            return;
-          }
-
           console.error('Scan error:', err);
           setCameraError(err.message || 'Camera error');
           readerRef.current.reset();
@@ -144,11 +111,40 @@ export default function ScannerView() {
     setIsScanning(false);
   }
 
+  function handleCleanDemo() {
+    const rawText =
+      '01' +
+      '08912345678900' +
+      '17' +
+      '280131' +
+      '10' +
+      'LOT001' +
+      '\u001D' +
+      '21' +
+      'SER001';
+
+    processScan(rawText);
+  }
+
+  function handleConflictDemo() {
+    const rawText =
+      '01' +
+      '08912345678900' +
+      '17' +
+      '290131' +
+      '10' +
+      'LOT001' +
+      '\u001D' +
+      '21' +
+      'SER002';
+
+    processScan(rawText);
+  }
+
   function handleResetHistory() {
     resetScanHistory();
     const freshLogs = clearAuditLogs();
 
-    scanCountRef.current = {};
     setLogs(freshLogs);
     setConflictResult(null);
     setParsedData(null);
@@ -158,25 +154,7 @@ export default function ScannerView() {
 
   return (
     <div style={{ padding: '1rem', maxWidth: '700px', margin: '0 auto' }}>
-      <style>
-        {`
-          @keyframes scanLineMove {
-            0% { top: 0%; }
-            50% { top: 100%; }
-            100% { top: 0%; }
-          }
-        `}
-      </style>
-
-      <h2
-        style={{
-          fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
-          fontWeight: 700,
-          letterSpacing: '0.3px',
-        }}
-      >
-        Barcode Scanner &amp; Audit System
-      </h2>
+      <h2>Barcode Scanner & Audit System</h2>
 
       <div
         style={{
@@ -196,6 +174,14 @@ export default function ScannerView() {
           </button>
         )}
 
+        <button onClick={handleCleanDemo}>
+          Clean Demo
+        </button>
+
+        <button onClick={handleConflictDemo}>
+          Conflict Demo
+        </button>
+
         <button onClick={handleResetHistory} style={{ marginLeft: 'auto' }}>
           Reset Scan History
         </button>
@@ -207,45 +193,17 @@ export default function ScannerView() {
         </p>
       )}
 
-      <div
+      <video
+        ref={videoRef}
         style={{
-          position: 'relative',
           width: '100%',
           maxWidth: '400px',
-          height: '180px',
           display: isScanning ? 'block' : 'none',
           border: '1px solid #ccc',
           borderRadius: '4px',
           marginBottom: '1rem',
-          overflow: 'hidden',
         }}
-      >
-        <video
-          ref={videoRef}
-          muted
-          autoPlay
-          playsInline
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            display: 'block',
-          }}
-        />
-        {isScanning && (
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              width: '100%',
-              height: '2px',
-              background: '#22c55e',
-              boxShadow: '0 0 8px 2px rgba(34, 197, 94, 0.8)',
-              animation: 'scanLineMove 2s linear infinite',
-            }}
-          />
-        )}
-      </div>
+      />
 
       {lookupLoading && (
         <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ccc', borderRadius: '6px' }}>
@@ -260,28 +218,11 @@ export default function ScannerView() {
             <>
               <p><strong>{productInfo.name}</strong></p>
               <p>Manufacturer: {productInfo.manufacturer}</p>
-              <p>Composition: {productInfo.composition}</p>
-              <p>Form: {productInfo.form}</p>
-
-              <h4 style={{ marginTop: '0.75rem' }}>Batch Detected This Scan</h4>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '6px 8px', border: '1px solid #ccc' }}>Batch</th>
-                    <th style={{ padding: '6px 8px', border: '1px solid #ccc' }}>MFD</th>
-                    <th style={{ padding: '6px 8px', border: '1px solid #ccc' }}>EXP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productInfo.shownBatch && (
-                    <tr>
-                      <td style={{ padding: '6px 8px', border: '1px solid #ccc' }}>{productInfo.shownBatch.batch}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #ccc' }}>{productInfo.shownBatch.mfd}</td>
-                      <td style={{ padding: '6px 8px', border: '1px solid #ccc' }}>{productInfo.shownBatch.expiry}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <p>Form: {productInfo.dosageForm}</p>
+              <p>Strength: {productInfo.strength}</p>
+              <p style={{ fontSize: '0.8rem', color: '#666' }}>
+                Source: {productInfo.source}
+              </p>
             </>
           ) : (
             <p>No drug found for this barcode.</p>
@@ -295,7 +236,9 @@ export default function ScannerView() {
             marginTop: '1rem',
             padding: '1rem',
             border: `2px solid ${
-              conflictResult.status === 'conflict' ? '#d32f2f' : '#2e7d32'
+              conflictResult.status === 'conflict'
+                ? '#d32f2f'
+                : '#2e7d32'
             }`,
             borderRadius: '6px',
             background: conflictResult.status === 'conflict' ? '#fff5f5' : '#f0fff4',
@@ -305,7 +248,10 @@ export default function ScannerView() {
 
           <p
             style={{
-              color: conflictResult.status === 'conflict' ? '#d32f2f' : '#2e7d32',
+              color:
+                conflictResult.status === 'conflict'
+                  ? '#d32f2f'
+                  : '#2e7d32',
               fontWeight: 'bold',
             }}
           >
@@ -313,34 +259,40 @@ export default function ScannerView() {
           </p>
 
           <p>
-            <strong>Status:</strong> {conflictResult.status}
+            <strong>Status:</strong>{' '}
+            {conflictResult.status}
           </p>
 
           {conflictResult.previous && (
             <div>
               <strong>Previous Scan:</strong>
 
-              <pre
-                style={{
-                  background: '#f4f4f4',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  overflowX: 'auto',
-                }}
-              >
-                {Object.entries(conflictResult.previous).map(([key, value], i, arr) => (
-                  <div key={key}>
-                    <span style={{ color: '#9333ea', fontWeight: 600 }}>"{key}"</span>
-                    <span style={{ color: '#000' }}>: </span>
-                    <span style={{ color: '#0284c7' }}>
-                      {typeof value === 'string' ? `"${value}"` : String(value)}
-                    </span>
-                    {i < arr.length - 1 && <span style={{ color: '#000' }}>,</span>}
-                  </div>
-                ))}
+              <pre style={{ background: '#f4f4f4', padding: '8px', borderRadius: '4px' }}>
+                {JSON.stringify(
+                  conflictResult.previous,
+                  null,
+                  2
+                )}
               </pre>
             </div>
           )}
+        </div>
+      )}
+
+      {parsedData && (
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            border: '1px solid #ccc',
+            borderRadius: '6px',
+          }}
+        >
+          <h3>Parsed Result</h3>
+
+          <pre style={{ background: '#f4f4f4', padding: '10px', borderRadius: '4px', overflowX: 'auto' }}>
+            {JSON.stringify(parsedData, null, 2)}
+          </pre>
         </div>
       )}
 

@@ -31,7 +31,17 @@ ATC_TO_DRUG_NAME = {
 DRUG_NAME_TO_ATC = {v: k for k, v in ATC_TO_DRUG_NAME.items()}
 
 # Mock drug IDs to simulate the drugs table until backend is available
-MOCK_DRUG_IDS = {atc: f"drug_{i+1:03d}" for i, atc in enumerate(ATC_TO_DRUG_NAME)}
+# Mapped to match the hardcoded UUIDs seeded in backend/seed/seed.sql
+MOCK_DRUG_IDS = {
+    "M01AB": "11111111-1111-1111-1111-111111111111", # Paracetamol (demo map)
+    "N02BE": "11111111-1111-1111-1111-111111111111", # Paracetamol
+    "M01AE": "22222222-2222-2222-2222-222222222222", # Amoxicillin
+    "N02BA": "33333333-3333-3333-3333-333333333333", # ORS
+    "N05B":  "44444444-4444-4444-4444-444444444444", # Insulin
+    "N05C":  "55555555-5555-5555-5555-555555555555", # Azithromycin
+    "R03":   "66666666-6666-6666-6666-666666666666", 
+    "R06":   "77777777-7777-7777-7777-777777777777",
+}
 
 
 def load_daily_sales(filepath: str = "data/salesdaily_cleaned.csv") -> pd.DataFrame:

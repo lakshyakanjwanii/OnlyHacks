@@ -1,49 +1,33 @@
-from fastapi import APIRouter, Depends, HTTPException
-from src.middleware.jwt_auth import get_db
+from fastapi import APIRouter, HTTPException
+import httpx
+import os
+import logging
 
-router = APIRouter(prefix="/api/v1/forecast", tags=["forecast"])
+router = APIRouter(tags=["Forecasts"])
+logger = logging.getLogger(__name__)
 
+# Fetch the URL from .env, default to localhost if missing
+ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8001")
 
-@router.get("/{drug_id}")
-async def get_forecast(drug_id: str, db=Depends(get_db)):
+@router.get("/api/v1/forecast/{drug_id}")
+async def get_live_forecast(drug_id: str):
     """
-    Proxy endpoint. Actual forecasting logic lives in the ML service
-    (teammate 5, /ml). This route just reads whatever the ML pipeline
-    has already written into the `forecasts` table and reshapes it
-    into exactly what the frontend's ForecastChart component expects:
-
-        { drug, dates[], predicted_stock[], reorder_threshold,
-          predicted_stockout_date }
-
-    If the ML service is deployed separately and reachable over HTTP,
-    swap the block below for an httpx call to it instead of reading
-    the cache table directly — the response shape must stay identical
-    either way.
+    Proxies the forecast request to the ML microservice.
     """
-    drug_result = db.table("drugs").select("name").eq("id", drug_id).limit(1).execute()
-    if not drug_result.data:
-        raise HTTPException(status_code=404, detail="Drug not found")
-    drug_name = drug_result.data[0]["name"]
-
-    rows = (
-        db.table("forecasts")
-        .select("*")
-        .eq("drug_id", drug_id)
-        .order("date")
-        .execute()
-        .data
-    )
-
-    if not rows:
-        raise HTTPException(
-            status_code=404,
-            detail="No forecast available yet for this drug — ML pipeline hasn't run.",
-        )
-
-    return {
-        "drug": drug_name,
-        "dates": [r["date"] for r in rows],
-        "predicted_stock": [r["predicted_stock"] for r in rows],
-        "reorder_threshold": rows[-1].get("reorder_threshold"),
-        "predicted_stockout_date": rows[-1].get("predicted_stockout_date"),
-    }
+    try:
+        # httpx handles the async request to Teammate 5's service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{ML_SERVICE_URL}/forecast/{drug_id}")
+            
+            # If the ML service returns a 404 or 500, catch it safely
+            response.raise_for_status()
+            
+            # Return the exact JSON straight to the React frontend
+            return response.json()
+            
+    except httpx.HTTPStatusError as e:
+        logger.error(f"ML Service returned an error: {e}")
+        raise HTTPException(status_code=e.response.status_code, detail="ML Forecasting service returned an error.")
+    except httpx.RequestError as e:
+        logger.error(f"Could not reach ML Service: {e}")
+        raise HTTPException(status_code=503, detail="ML Forecasting service is currently unreachable.")

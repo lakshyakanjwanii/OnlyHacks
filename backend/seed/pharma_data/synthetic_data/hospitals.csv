@@ -1,0 +1,21 @@
+hospital_id,hospital_name,region,bed_capacity
+HOSP_001,General Hospital 1,North,202
+HOSP_002,General Hospital 2,Central,535
+HOSP_003,General Hospital 3,North,960
+HOSP_004,General Hospital 4,Central,370
+HOSP_005,General Hospital 5,West,206
+HOSP_006,General Hospital 6,North,171
+HOSP_007,General Hospital 7,North,800
+HOSP_008,General Hospital 8,North,120
+HOSP_009,General Hospital 9,South,714
+HOSP_010,General Hospital 10,South,221
+HOSP_011,General Hospital 11,Central,566
+HOSP_012,General Hospital 12,Central,314
+HOSP_013,General Hospital 13,North,430
+HOSP_014,General Hospital 14,Central,558
+HOSP_015,General Hospital 15,South,187
+HOSP_016,General Hospital 16,Central,472
+HOSP_017,General Hospital 17,West,199
+HOSP_018,General Hospital 18,South,971
+HOSP_019,General Hospital 19,West,763
+HOSP_020,General Hospital 20,Central,230

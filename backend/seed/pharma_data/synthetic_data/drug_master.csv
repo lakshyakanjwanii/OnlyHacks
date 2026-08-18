@@ -1,0 +1,9 @@
+drug_code,description,unit_price_usd,storage_temp_c
+M01AB,Anti-inflammatory (Acetic acid),15.5,Room Temp
+M01AE,Anti-inflammatory (Propionic acid),12.0,2-8°C
+N02BA,Analgesics (Salicylic acid),8.25,2-8°C
+N02BE,Analgesics (Pyrazolones/Anilides),9.5,Room Temp
+N05B,Anxiolytics,25.0,15-25°C
+N05C,Hypnotics and sedatives,30.0,2-8°C
+R03,Drugs for obstructive airway diseases,45.0,2-8°C
+R06,Antihistamines for systemic use,11.75,2-8°C

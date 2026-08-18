@@ -20,7 +20,25 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
+# ── MONKEY PATCH FOR MODERN KEYS ─────────────────────────────────────────────
+# The supabase-py package rigidly expects a JWT format (with periods) and
+# crashes with "Invalid API key" for modern sb_publishable_... keys.
+# We patch the regex matcher in the client module to bypass this.
+import re
+import supabase._sync.client
+
+_original_match = re.match
+def _bypass_jwt_check(pattern, string, *args, **kwargs):
+    pat_str = getattr(pattern, "pattern", pattern)
+    if isinstance(pat_str, str) and "A-Za-z0-9-_=" in pat_str and str(string).startswith("sb_"):
+        return True # Bypass for modern Supabase keys
+    return _original_match(pattern, string, *args, **kwargs)
+
+supabase._sync.client.re.match = _bypass_jwt_check
+# ─────────────────────────────────────────────────────────────────────────────
+
 supabase_anon: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 

@@ -286,12 +286,32 @@ import numpy as np
 import pandas as pd
 from prophet import Prophet
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load env variables from root or backend
+load_dotenv(str(Path(__file__).resolve().parent.parent.parent / "backend" / ".env"))
 
 # Fallback directly to the provided project credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://oinmewjpqvtswovyxwfb.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", " ")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_KEY", " "))
+
+
+# ── MONKEY PATCH FOR MODERN KEYS ─────────────────────────────────────────────
+import re
+import supabase._sync.client
+
+_original_match = re.match
+def _bypass_jwt_check(pattern, string, *args, **kwargs):
+    pat_str = getattr(pattern, "pattern", pattern)
+    if isinstance(pat_str, str) and "A-Za-z0-9-_=" in pat_str and str(string).startswith("sb_"):
+        return True # Bypass for modern Supabase keys
+    return _original_match(pattern, string, *args, **kwargs)
+
+supabase._sync.client.re.match = _bypass_jwt_check
+# ─────────────────────────────────────────────────────────────────────────────
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 warnings.filterwarnings("ignore")  # suppress Prophet/Stan noise
 

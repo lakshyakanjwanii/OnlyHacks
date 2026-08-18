@@ -1,0 +1,11 @@
+vendor_id,vendor_name,lead_time_days,reliability_score
+VEND_001,Pharma Supply Co 1,7,0.89
+VEND_002,Pharma Supply Co 2,6,0.92
+VEND_003,Pharma Supply Co 3,3,0.91
+VEND_004,Pharma Supply Co 4,9,0.89
+VEND_005,Pharma Supply Co 5,13,0.94
+VEND_006,Pharma Supply Co 6,7,0.87
+VEND_007,Pharma Supply Co 7,3,0.89
+VEND_008,Pharma Supply Co 8,13,0.9
+VEND_009,Pharma Supply Co 9,6,0.91
+VEND_010,Pharma Supply Co 10,2,0.96

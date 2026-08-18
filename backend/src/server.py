@@ -9,14 +9,30 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# NOTE: tighten allow_origins to the deployed frontend URL before the
-# live demo — wide open for local dev across all 5 team members' machines.
+import os
+
+FRONTEND_URL = os.getenv("FRONTEND_URL")
+ENV = os.getenv("ENV", "development")
+
+_local_origins = ["http://localhost:5173", "http://127.0.0.1:5173",
+                   "http://localhost:5174", "http://127.0.0.1:5174"]  # Vite fallback port
+
+if ENV == "production":
+    if not FRONTEND_URL:
+        raise RuntimeError(
+            "ENV=production but FRONTEND_URL is not set — refusing to start "
+            "with no valid CORS origin. Set FRONTEND_URL in your .env."
+        )
+    allow_origins = [FRONTEND_URL]
+else:
+    allow_origins = _local_origins + ([FRONTEND_URL] if FRONTEND_URL else [])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
 app.include_router(drugs.router)
@@ -31,4 +47,4 @@ app.include_router(keys.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "backend"}
+    return {"status": "ok", "service": "backend", "env": ENV, "cors_origins": allow_origins}

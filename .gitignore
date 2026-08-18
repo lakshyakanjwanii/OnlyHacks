@@ -1,4 +1,37 @@
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
-.vscode/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+env/
+.env.local
+
+# ── Environment / secrets — NEVER commit real keys ───────────────────────────
+backend/.env
+frontend/.env
 .env
+.env.local
+.env.*.local
+
+# ── Node / frontend ───────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+*.tsbuildinfo
+.DS_Store
+
+# ── Editor / OS ───────────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db

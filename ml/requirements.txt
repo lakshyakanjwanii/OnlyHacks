@@ -1,0 +1,13 @@
+# ML Service direct dependencies
+# Python >= 3.10 required (for match/case); tested on 3.13
+fastapi
+uvicorn[standard]
+pandas
+numpy
+scikit-learn
+python-dotenv
+supabase
+prophet
+plotly
+httpx
+pydantic

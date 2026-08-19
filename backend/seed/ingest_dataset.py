@@ -121,15 +121,18 @@ def ingest_batches():
     # Deliberate conflict injection for the anomaly engine
     if os.path.exists(conflicts_path):
         conflicts = pd.read_csv(conflicts_path)
+        conflict_added = set()
         for _, row in conflicts.iterrows():
             batch_id = str(row["batch_id"])
-            if batch_id in processed_batches:
+            if batch_id in processed_batches and batch_id not in conflict_added:
+                conflict_added.add(batch_id)
                 batches_data.append({
                     "id": make_uuid(batch_id + "_conflict"),
                     "drug_id": make_uuid(row["drug_code"]),
                     "batch_number": batch_id,
                     "manufacture_date": "2024-01-01",
                     "expiry_date": "2025-12-31",
+                    "created_at": "2024-01-01T00:00:00Z"
                 })
             
     if batches_data:
@@ -152,7 +155,7 @@ def ingest_shipments_as_scans():
             "batch_id": make_uuid(str(row["batch_id"])),
             "node_type": "vendor",
             "node_id": str(row["vendor_id"]),
-            "scanned_by": "SYSTEM_INGEST",
+            "scanned_by": None,
             "location": f"Vendor Facility: {row['vendor_id']}",
             "timestamp": f"{row['ship_date']}T08:00:00Z",
             "raw_payload": {
@@ -169,7 +172,7 @@ def ingest_shipments_as_scans():
                 "batch_id": make_uuid(str(row["batch_id"])),
                 "node_type": "hospital",
                 "node_id": str(row["hospital_id"]),
-                "scanned_by": "SYSTEM_INGEST",
+                "scanned_by": None,
                 "location": f"Hospital Receiving: {row['hospital_id']}",
                 "timestamp": f"{row['ship_date']}T16:00:00Z",
                 "raw_payload": {

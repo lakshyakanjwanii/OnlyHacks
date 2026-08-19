@@ -50,22 +50,22 @@ def _get_dataset() -> pd.DataFrame:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 ML service starting — loading dataset...")
+    print("[ML] Service starting -- loading dataset...")
     try:
         _get_dataset()
-        print("✅ Dataset loaded")
+        print("[ML] Dataset loaded OK")
     except FileNotFoundError as e:
-        print(f"⚠️  {e}")
-        print("   Service will start but /forecast endpoints won't work until dataset is placed.")
+        print(f"[ML] WARNING: {e}")
+        print("    Service will start but /forecast endpoints won't work until dataset is placed.")
 
     # Subscribe to Supabase anomalies in background thread (non-blocking)
     if os.environ.get("ENABLE_REALTIME_ALERTS", "false").lower() == "true":
         import threading
         threading.Thread(target=subscribe_anomalies_realtime, daemon=True).start()
-        print("📡 Anomaly realtime subscription started")
+        print("[ML] Anomaly realtime subscription started")
 
     yield
-    print("ML service shutting down")
+    print("[ML] Service shutting down")
 
 
 # ── app ───────────────────────────────────────────────────────────────────────
@@ -90,6 +90,7 @@ app.add_middleware(
 class ForecastResponse(BaseModel):
     drug_id: str
     drug_name: str
+    drug: str = ""         # alias kept for frontend ForecastChart compatibility
     dates: list[str]
     predicted_stock: list[float]
     reorder_threshold: float
@@ -180,6 +181,7 @@ def get_forecast(
     try:
         result = run_drug_forecast(drug_id, series, current_stock=current_stock)
         result["drug_name"] = info.get("drug_name", drug_id)
+        result["drug"] = result["drug_name"]  # frontend ForecastChart reads forecast.drug
         _forecast_cache[drug_id] = result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Forecasting failed: {str(e)}")
@@ -202,6 +204,8 @@ async def run_full_pipeline(background_tasks: BackgroundTasks):
 
     # 1. Forecast all drugs
     results = run_all_forecasts(df)
+    for r in results:
+        r["drug"] = r.get("drug_name", r["drug_id"])
     _forecast_cache.update({r["drug_id"]: r for r in results})
 
     # 2. Write to DB
@@ -211,16 +215,17 @@ async def run_full_pipeline(background_tasks: BackgroundTasks):
     expiry_flagged = scan_all_batches_for_expiry_risk(results)
 
     # 4. Fire expiry risk alerts
+    # NOTE: alert_expiry_risk is a plain async def; asyncio.coroutine() was
+    # removed in Python 3.11. Use background_tasks.add_task directly.
     if expiry_flagged:
         from alerts.notify import alert_expiry_risk
         for batch in expiry_flagged:
             background_tasks.add_task(
-                asyncio.coroutine(alert_expiry_risk)(
-                    drug_name=batch["drug_id"],
-                    batch_id=batch["batch_id"],
-                    units_at_risk=batch["units_at_risk"],
-                    expiry_date="unknown",
-                )
+                alert_expiry_risk,
+                drug_name=batch.get("drug_name", batch["drug_id"]),
+                batch_id=batch["batch_id"],
+                units_at_risk=batch["units_at_risk"],
+                expiry_date=batch.get("expiry_date", "unknown"),
             )
 
     # 5. Fire stockout alerts
@@ -274,4 +279,4 @@ def _adjust_stock(result: dict, new_stock: float) -> dict:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8001, reload=True)
